@@ -6,7 +6,7 @@ from listenbrainz.db import timescale as ts
 
 
 def create_length_cache_tmp():
-    with psycopg2.sql.connect(current_app.config["MBID_MAPPING_DATABASE_URI"]) as mb_conn, \
+    with psycopg2.connect(current_app.config["MBID_MAPPING_DATABASE_URI"]) as mb_conn, \
             mb_conn.cursor('recording_length_cursor', cursor_factory=DictCursor) as mb_curs, \
             ts.engine.raw_connection() as lb_conn, \
             lb_conn.cursor(cursor_factory=DictCursor) as lb_curs:
