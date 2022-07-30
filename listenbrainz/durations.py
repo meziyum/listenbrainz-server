@@ -16,7 +16,7 @@ def create_length_cache_tmp():
         print("Total rows: ", mb_curs.rowcount)
         done = 0
         while True:
-            rows = mb_curs.fetchmany(1000)
+            rows = mb_curs.fetchmany(25000)
             if not rows:
                 break
 
@@ -26,6 +26,4 @@ def create_length_cache_tmp():
             done += 1000
             print("Rows done: ", done)
 
-        lb_curs.execute("CREATE INDEX mapping.recording_length_cache_tmp_idx"
-                        "          ON mapping.recording_length_cache_tmp(gid) INCLUDE (length)")
     lb_conn.commit()
