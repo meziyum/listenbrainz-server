@@ -7,6 +7,7 @@ import sqlalchemy
 from listenbrainz import db
 from listenbrainz import webserver
 from listenbrainz.db import timescale as ts
+from listenbrainz.durations import create_length_cache_tmp
 from listenbrainz.listenstore import timescale_fill_userid
 from listenbrainz.listenstore.timescale_utils import recalculate_all_user_data as ts_recalculate_all_user_data, \
     update_user_listen_data as ts_update_user_listen_data, \
@@ -335,3 +336,9 @@ def listen_add_userid():
     app = create_app()
     with app.app_context():
         timescale_fill_userid.fill_userid()
+
+
+@cli.command()
+def create_length_cache():
+    with create_app().app_context():
+        create_length_cache_tmp()
