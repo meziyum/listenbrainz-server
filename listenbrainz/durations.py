@@ -1,22 +1,19 @@
+import psycopg2
 from flask import current_app
 from psycopg2.extras import DictCursor, execute_values
-from sqlalchemy import create_engine, text
-from sqlalchemy.pool import NullPool
 
 from listenbrainz.db import timescale as ts
 
 
 def create_length_cache_tmp():
-    mb_engine = create_engine(current_app.config["MBID_MAPPING_DATABASE_URI"], poolclass=NullPool)
-
-    with mb_engine.connect() as mb_conn, \
+    with psycopg2.sql.connect(current_app.config["MBID_MAPPING_DATABASE_URI"]) as mb_conn, \
+            mb_conn.cursor('recording_length_cursor', cursor_factory=DictCursor) as mb_curs, \
             ts.engine.raw_connection() as lb_conn, \
             lb_conn.cursor(cursor_factory=DictCursor) as lb_curs:
         lb_curs.execute("CREATE TABLE mapping.recording_length_cache_tmp (gid UUID NOT NULL, length INT NOT NULL)")
-        mb_curs = mb_conn.execute(text("SELECT gid, length FROM musicbrainz.recording WHERE length IS NOT NULL"))
-        count = mb_curs.rowcount
+        mb_curs.execute("SELECT gid, length FROM musicbrainz.recording WHERE length IS NOT NULL")
 
-        print("Total rows: ", count)
+        print("Total rows: ", mb_curs.rowcount)
         done = 0
         while True:
             rows = mb_curs.fetchmany(1000)
