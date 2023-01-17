@@ -84,7 +84,7 @@ class TimescaleListenStore:
 
             query_remaining = """
                 SELECT count(*) AS remaining_count
-                  FROM listen
+                  FROM listen_new
                  WHERE user_id = :user_id
                    AND created > :created
             """
@@ -120,7 +120,7 @@ class TimescaleListenStore:
              -- the last page and it is likely no one would notice, so need to do extra work
              listens_after_update AS (
                 SELECT max(listened_at) AS new_max_ts
-                  FROM listen l
+                  FROM listen_new l
                 -- we want max(listened_at) so why bother adding a >= listened_at clause?
                 -- because we want to limit the scan to a few chunks making the query run much faster
                 -- (except for the cases listens in last_update CTE where existing_max_ts will 0)
@@ -181,11 +181,11 @@ class TimescaleListenStore:
         for listen in listens:
             submit.append(listen.to_timescale())
 
-        query = """INSERT INTO listen (listened_at, track_name, user_name, user_id, data)
+        query = """INSERT INTO listen_new (listened_at, user_id, recording_msid, data)
                         VALUES %s
-                   ON CONFLICT (listened_at, track_name, user_id)
+                   ON CONFLICT (listened_at, user_id, recording_msid)
                     DO NOTHING
-                     RETURNING listened_at, track_name, user_name, user_id"""
+                     RETURNING listened_at, user_id, recording_msid"""
 
         inserted_rows = []
         conn = timescale.engine.raw_connection()
@@ -196,7 +196,7 @@ class TimescaleListenStore:
                     result = curs.fetchone()
                     if not result:
                         break
-                    inserted_rows.append((result[0], result[1], result[2], result[3]))
+                    inserted_rows.append((result[0], result[1], result[2]))
             except UntranslatableCharacter:
                 conn.rollback()
                 return
@@ -237,25 +237,25 @@ class TimescaleListenStore:
         query = """
                    WITH selected_listens AS (
                         SELECT l.listened_at
-                             , l.track_name
-                             , l.user_id
                              , l.created
+                             , l.user_id
+                             , l.recording_msid
                              , l.data
                              -- prefer to use user specified mapping, then mbid mapper's mapping, finally other user's specified mappings
                              , COALESCE(user_mm.recording_mbid, mm.recording_mbid, other_mm.recording_mbid) AS recording_mbid
-                          FROM listen l
+                          FROM listen_new l
                      LEFT JOIN mbid_mapping mm
-                            ON (data->'track_metadata'->'additional_info'->>'recording_msid')::uuid = mm.recording_msid
+                            ON l.recording_msid = mm.recording_msid
                      LEFT JOIN mbid_manual_mapping user_mm
-                            ON (data->'track_metadata'->'additional_info'->>'recording_msid')::uuid = user_mm.recording_msid
+                            ON l.recording_msid = user_mm.recording_msid
                            AND user_mm.user_id = l.user_id 
                      LEFT JOIN mbid_manual_mapping_top other_mm
-                            ON (data->'track_metadata'->'additional_info'->>'recording_msid')::uuid = other_mm.recording_msid
+                            ON l.recording_msid = other_mm.recording_msid
                    )
                    SELECT listened_at
-                        , track_name
                         , user_id
                         , created
+                        , sl.recording_msid::TEXT
                         , data
                         , sl.recording_mbid
                         , mbc.release_mbid
@@ -273,7 +273,7 @@ class TimescaleListenStore:
                       AND listened_at > :from_ts
                       AND listened_at < :to_ts
                  GROUP BY listened_at
-                        , track_name
+                        , sl.recording_msid
                         , user_id
                         , created
                         , data
@@ -346,10 +346,10 @@ class TimescaleListenStore:
 
                     listens.append(Listen.from_timescale(
                         listened_at=result.listened_at,
-                        track_name=result.track_name,
                         user_id=result.user_id,
                         created=result.created,
-                        data=result.data,
+                        recording_msid=result.recording_msid,
+                        track_metadata=result.data,
                         recording_mbid=result.recording_mbid,
                         release_mbid=result.release_mbid,
                         artist_mbids=result.artist_mbids,
@@ -401,12 +401,12 @@ class TimescaleListenStore:
         query = f"""
               WITH intermediate AS (
                     SELECT listened_at
-                         , track_name
-                         , user_id
                          , created
+                         , user_id
+                         , recording_msid
                          , data
                          , row_number() OVER (PARTITION BY user_id ORDER BY listened_at DESC) AS rownum
-                      FROM listen l
+                      FROM listen_new l
                      WHERE {filters} 
               ), selected_listens AS (
                     SELECT l.*
@@ -414,17 +414,17 @@ class TimescaleListenStore:
                          , COALESCE(user_mm.recording_mbid, mm.recording_mbid, other_mm.recording_mbid) AS recording_mbid
                       FROM intermediate l
                  LEFT JOIN mbid_mapping mm
-                        ON (data->'track_metadata'->'additional_info'->>'recording_msid')::uuid = mm.recording_msid
+                        ON l.recording_msid = mm.recording_msid
                  LEFT JOIN mbid_manual_mapping user_mm
-                        ON (data->'track_metadata'->'additional_info'->>'recording_msid')::uuid = user_mm.recording_msid
+                        ON l.recording_msid = user_mm.recording_msid
                        AND user_mm.user_id = l.user_id 
                  LEFT JOIN mbid_manual_mapping_top other_mm
-                        ON (data->'track_metadata'->'additional_info'->>'recording_msid')::uuid = other_mm.recording_msid
+                        ON l.recording_msid = other_mm.recording_msid
                      WHERE rownum <= :per_user_limit
               )     SELECT user_id
                          , listened_at
-                         , track_name
                          , created
+                         , l.recording_msid::TEXT
                          , data
                          , l.recording_mbid
                          , mbc.release_mbid
@@ -440,7 +440,7 @@ class TimescaleListenStore:
                         ON TRUE            
                   GROUP BY user_id
                          , listened_at
-                         , track_name
+                         , l.recording_msid
                          , created
                          , data
                          , l.recording_mbid
@@ -462,10 +462,10 @@ class TimescaleListenStore:
                 user_name = user_id_map[result.user_id]
                 listens.append(Listen.from_timescale(
                     listened_at=result.listened_at,
-                    track_name=result.track_name,
                     user_id=result.user_id,
                     created=result.created,
-                    data=result.data,
+                    recording_msid=result.recording_msid,
+                    track_metadata=result.data,
                     recording_mbid=result.recording_mbid,
                     release_mbid=result.release_mbid,
                     artist_mbids=result.artist_mbids,
@@ -517,7 +517,7 @@ class TimescaleListenStore:
                 if member.name.endswith(".listens"):
                     if not schema_checked:
                         raise SchemaMismatchException(
-                            "SCHEMA_SEQUENCE file missing from listen dump.")
+                            "SCHEMA_SEQUENCE file missing FROM listen_new dump.")
 
                     # tarf, really? That's the name you're going with? Yep.
                     with tar.extractfile(member) as tarf:
@@ -540,7 +540,7 @@ class TimescaleListenStore:
 
         if not schema_checked:
             raise SchemaMismatchException(
-                "SCHEMA_SEQUENCE file missing from listen dump.")
+                "SCHEMA_SEQUENCE file missing FROM listen_new dump.")
 
         self.log.info('Import of listens from dump %s done!', archive_path)
         xz.stdout.close()
@@ -564,7 +564,7 @@ class TimescaleListenStore:
                  , min_listened_at = NULL
                  , max_listened_at = NULL
              WHERE user_id = :user_id;
-            DELETE FROM listen WHERE user_id = :user_id;
+            DELETE FROM listen_new WHERE user_id = :user_id;
         """
         try:
             with timescale.engine.begin() as connection:
