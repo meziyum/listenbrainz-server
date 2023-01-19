@@ -186,7 +186,7 @@ class TimescaleListenStore:
         for listen in listens:
             submit.append(listen.to_timescale())
 
-        query = """INSERT INTO listen_new (listened_at, user_id, recording_msid, data)
+        query = """INSERT INTO listen_new (listened_at, tz_offset, user_id, recording_msid, data)
                         VALUES %s
                    ON CONFLICT (listened_at, user_id, recording_msid)
                     DO NOTHING
@@ -242,6 +242,7 @@ class TimescaleListenStore:
         query = """
                    WITH selected_listens AS (
                         SELECT l.listened_at
+                             , l.tz_offset
                              , l.created
                              , l.user_id
                              , l.recording_msid
@@ -258,6 +259,7 @@ class TimescaleListenStore:
                             ON l.recording_msid = other_mm.recording_msid
                    )
                    SELECT listened_at
+                        , tz_offset
                         , user_id
                         , created
                         , sl.recording_msid::TEXT
@@ -279,6 +281,7 @@ class TimescaleListenStore:
                       AND listened_at < :to_ts
                  GROUP BY listened_at
                         , sl.recording_msid
+                        , tz_offset
                         , user_id
                         , created
                         , data
@@ -351,6 +354,8 @@ class TimescaleListenStore:
 
                     listens.append(Listen.from_timescale(
                         listened_at=result.listened_at,
+                        tz_offset=result.tz_offset,
+                        user_timezone=user.get("timezone_name"),
                         user_id=result.user_id,
                         created=result.created,
                         recording_msid=result.recording_msid,

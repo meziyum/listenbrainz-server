@@ -9,15 +9,6 @@ CREATE TABLE listen_new (
     data            JSONB                    NOT NULL
 );
 
-SELECT create_hypertable('listen', 'listened_at', chunk_time_interval => INTERVAL '30 days');
-
-INSERT INTO listen_new (listened_at, tz_offset, created,  user_id, recording_msid, data)
-     SELECT listened_at
-          , NULL
-          , created
-          , user_id
-          , (data->'track_metadata'->>'recording_msid')::UUID
-          , jsonb_insert((data->'track_metadata')::jsonb - 'recording_msid', '{track_name}', to_jsonb(track_name))
-       FROM listen;
+SELECT create_hypertable('listen_new', 'listened_at', chunk_time_interval => INTERVAL '30 days');
 
 COMMIT;
