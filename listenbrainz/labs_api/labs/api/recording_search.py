@@ -1,4 +1,4 @@
-import ujson
+import orjson
 
 import typesense
 import typesense.exceptions

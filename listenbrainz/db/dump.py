@@ -34,7 +34,7 @@ from ftplib import FTP
 from typing import Tuple, Optional
 
 import sqlalchemy
-import ujson
+import orjson
 from brainzutils.mail import send_mail
 from flask import current_app, render_template
 from psycopg2.sql import Identifier, SQL, Composable
@@ -559,7 +559,7 @@ def dump_user_feedback(connection, location):
                 os.makedirs(full_path)
                 with open(os.path.join(full_path, "data.json"), "wb") as f:
                     for item in todays_items:
-                        f.write(bytes(ujson.dumps(item) + "\n", "utf-8"))
+                        f.write(bytes(orjson.dumps(item) + "\n", "utf-8"))
                 todays_items = []
 
             if not row:
@@ -594,7 +594,7 @@ def dump_user_feedback(connection, location):
                 os.makedirs(full_path)
                 with open(os.path.join(full_path, "data.json"), "wb") as f:
                     for item in todays_items:
-                        f.write(bytes(ujson.dumps(item) + "\n", "utf-8"))
+                        f.write(bytes(orjson.dumps(item) + "\n", "utf-8"))
                 todays_items = []
 
             if not row:

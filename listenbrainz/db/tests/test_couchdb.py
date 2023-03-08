@@ -4,7 +4,7 @@ from io import StringIO
 from unittest.mock import patch
 
 import requests
-import ujson
+import orjson
 
 from listenbrainz import config
 from listenbrainz.db import couchdb

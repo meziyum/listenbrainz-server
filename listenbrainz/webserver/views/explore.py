@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, current_app
-import ujson
+import orjson
 from werkzeug.exceptions import NotFound
 
 from listenbrainz.db.similar_users import get_top_similar_users
@@ -13,7 +13,7 @@ def index():
 
     return render_template(
         "explore/index.html",
-        props=ujson.dumps({})
+        props=orjson.dumps({})
     )
 
 
@@ -23,7 +23,7 @@ def huesound():
 
     return render_template(
         "explore/huesound.html",
-        props=ujson.dumps({})
+        props=orjson.dumps({})
     )
 
 
@@ -47,7 +47,7 @@ def fresh_releases():
 
     return render_template(
         "explore/fresh-releases.html",
-        props=ujson.dumps({})
+        props=orjson.dumps({})
     )
 
 @explore_bp.route("/cover-art-collage/")

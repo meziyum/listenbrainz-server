@@ -3,7 +3,7 @@ import sys
 from datetime import date
 
 import click
-import ujson
+import orjson
 from kombu import Connection
 from kombu.entity import PERSISTENT_DELIVERY_MODE, Exchange
 
@@ -28,7 +28,7 @@ def _get_possible_queries():
     be sent to Spark. Listed in listenbrainz/spark/request_queries.json
     """
     with open(QUERIES_JSON_PATH) as f:
-        return ujson.load(f)
+        return orjson.load(f)
 
 
 def _prepare_query_message(query, **params):
@@ -60,7 +60,7 @@ def _prepare_query_message(query, **params):
         for key, value in params.items():
             message['params'][key] = value
 
-    return ujson.dumps(message)
+    return orjson.dumps(message)
 
 
 def send_request_to_spark_cluster(query, **params):

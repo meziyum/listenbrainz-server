@@ -9,7 +9,7 @@ import listenbrainz.db.user as db_user
 import pika
 import pika.exceptions
 import time
-import ujson
+import orjson
 import uuid
 import sentry_sdk
 
@@ -270,7 +270,7 @@ def log_raise_400(msg, data=""):
     """
 
     if isinstance(data, dict):
-        data = ujson.dumps(data)
+        data = orjson.dumps(data)
 
     current_app.logger.debug("BadRequest: %s\nJSON: %s" % (msg, data))
     raise APIBadRequest(msg)
@@ -388,7 +388,7 @@ def publish_data_to_queue(data, exchange, queue, error_msg):
             channel.basic_publish(
                 exchange=exchange,
                 routing_key='',
-                body=ujson.dumps(data),
+                body=orjson.dumps(data),
                 properties=pika.BasicProperties(delivery_mode=2, ),
             )
     except pika.exceptions.ConnectionClosed as e:

@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple, Iterable
 
-import ujson
+import orjson
 from pydantic import ValidationError
 from requests import HTTPError
 
